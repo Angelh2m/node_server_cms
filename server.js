@@ -28,8 +28,10 @@ mongoose
     .then(() => console.log('MongoDB Connected'))
     .catch((err) => console.log(err));
 
+/* *
+ *  PASSPORT STRATEGIES
+ */
 app.use(passport.initialize());
-
 require('./config/passport')(passport);
 require('./config/passport-google')(passport);
 
