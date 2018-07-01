@@ -21,8 +21,12 @@ router.get('/test', (req, res) => res.json({ msg: 'Posts Works' }));
 // @access  Public
 router.get('/', (req, res) => {
     Post.find()
+        .populate('likes.user', 'name avatar')
+        .populate('comments.user', 'name date avatar')
         .sort({ date: -1 })
-        .then(post => res.status(200).json(post))
+        .then(post => res.status(200).json({
+            post
+        }))
         .catch(err => res.status(404).json({
             noPostFound: 'No posts found',
             err
@@ -46,19 +50,12 @@ router.get('/:id', (req, res) => {
 // @desc    Create post
 // @access  Private
 router.post('/', passport.authenticate('jwt', { session: false }), (req, res) => {
-    // const { errors, isValid } = validatePostInput(req.body);
-
-    // Check Validation
-    // if (!isValid) {
-    //     // If any errors, send 400 with errors object
-    //     return res.status(400).json(errors);
-    // }
 
     const newPost = new Post({
-        text: req.body.text,
-        name: req.body.name,
-        avatar: req.body.avatar,
-        user: req.user.id,
+        title: req.body.title,
+        excerpt: req.body.excerpt,
+        body: req.body.body,
+        author: req.user.id,
         tags: req.body.tags,
         category: req.body.category
     });
@@ -104,30 +101,98 @@ router.delete('/:id', passport.authenticate('jwt', { session: false }), (req, re
 
 // @route   GET api/posts/like/:id
 // @desc    Like the post
-// @access  Public
-router.post('/like/:id', (req, res) => {
+// @access  Private
+router.post('/like/:id', passport.authenticate('jwt', { session: false }), (req, res) => {
 
     Post.findById(req.params.id).then(post => {
 
-        // console.log(req.params.id)
 
-        post.likes.push({ user: 'liked' });
+        if (post.likes.filter(like => like.user.toString() === req.user.id).length > 0) {
+            return res.status(401).json({
+                ok: false,
+                message: `${req.user.name}, you have already liked this post`,
+            })
+        }
 
-        post.save().then(() => {
-                res.json({
-                    success: true,
-                    likes: post.likes
+        post.likes.unshift({ user: req.user.id });
+
+        console.log(post.likes);
+
+        post.save()
+            .then((entry) => {
+                res.status(200).json({
+                    ok: true,
                 })
             })
             .catch((err) => {
                 res.status(404).json({
+                    ok: false,
                     message: 'Unable to like the post'
                 })
             })
 
-    });
+    }).catch(err => res.status(404).json({ message: 'Sorry, at this time you can\'t like this post' }))
 
 });
+
+
+
+// @route   GET api/posts/comment/:id
+// @desc    Create a new Comment
+// @access  Private
+router.post('/comment/:id', passport.authenticate('jwt', { session: false }), (req, res) => {
+
+    Post.findById(req.params.id).then(post => {
+
+        const newComment = {
+            text: req.body.text,
+            name: req.body.name,
+            avatar: req.body.avatar,
+            user: req.user.id,
+            isApproved: false
+        }
+
+        post.comments.unshift(newComment);
+
+        post.save().then(post => {
+            res.status(200).json({
+                post
+            })
+        }).catch(err => res.status(404).json({
+            message: 'Post not found'
+        }))
+
+    }).catch(err => res.status(400).json({ err }))
+});
+
+
+// @route   PUT api/comment/:id
+// @desc    Approve comments
+// @access  Private
+router.put('/comment/:id', (req, res) => {
+
+    Post.findById(req.params.id).then(entry => {
+
+        const isApproved = req.body.isApproved;
+        const commentId = req.body.id;
+        let commentID;
+        entry.comments.findIndex((el, index) => {
+            el.id == commentId ? commentID = index : null;
+        })
+
+        entry.comments[commentID].isApproved = isApproved;
+        console.log(entry.comments[commentID].isApproved);
+
+        entry.save()
+            .then(el => res.status(200).json({ el }))
+            .catch(err => res.status(400).json({ err }))
+
+    });
+});
+
+
+
+
 
 
 module.exports = router;

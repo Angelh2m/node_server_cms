@@ -118,5 +118,14 @@ router.get('/current', passport.authenticate('jwt', { session: false }),
 
 );
 
+// @route   GET api/users/current
+// @desc    Return current user // Protected route using token
+// @access  Private
+// router.get('/all', (req, res) => {
+//     console.log('All users ');
+
+//     User.find().then(all => res.status(200).json({ all }))
+// });
+
 
 module.exports = router;

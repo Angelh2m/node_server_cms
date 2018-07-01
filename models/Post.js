@@ -3,27 +3,37 @@ const Schema = mongoose.Schema;
 
 // Create Schema
 const PostSchema = new Schema({
-    user: {
-        type: Schema.Types.ObjectId,
-        ref: 'users'
-    },
-    text: {
+
+    title: {
         type: String,
         required: true
     },
-    name: {
+    excerpt: {
+        type: String,
+        required: true
+    },
+    body: {
+        type: String,
+        required: true
+    },
+    author: {
+        type: Schema.Types.ObjectId,
+        ref: 'users'
+    },
+    date: {
+        type: Date,
+        default: Date.now
+    },
+    tags: {
         type: String
     },
-    avatar: {
+    category: {
         type: String
     },
     likes: [{
-        // user: {
-        //     type: Schema.Types.ObjectId,
-        //     ref: 'users'
-        // }
         user: {
-            type: String
+            type: Schema.Types.ObjectId,
+            ref: 'users'
         }
     }],
     comments: [{
@@ -41,21 +51,15 @@ const PostSchema = new Schema({
         avatar: {
             type: String
         },
+        isApproved: {
+            type: String
+        },
         date: {
             type: Date,
             default: Date.now
         }
-    }],
-    date: {
-        type: Date,
-        default: Date.now
-    },
-    tags: {
-        type: String
-    },
-    category: {
-        type: String
-    }
+    }]
+
 });
 
 module.exports = Post = mongoose.model('post', PostSchema);
