@@ -18,12 +18,6 @@ router.get('/test', (req, res) => res.json({ msg: 'Users Works' }));
 // @desc    Register route
 // @access  Public
 router.post('/register', (req, res) => {
-    //   const { errors, isValid } = validateRegisterInput(req.body);
-
-    // Check Validation
-    //   if (!isValid) {
-    //     return res.status(400).json(errors);
-    //   }
 
     User.findOne({ email: req.body.email }).then((user) => {
         if (user) {
@@ -90,8 +84,6 @@ router.post('/login', (req, res) => {
                         token: `Bearer ${token}`
                     })
                 });
-
-
             }
 
             if (!isMatch) {
@@ -99,6 +91,7 @@ router.post('/login', (req, res) => {
                     password: 'Incorrect password'
                 });
             }
+
         });
     });
 });
@@ -121,11 +114,11 @@ router.get('/current', passport.authenticate('jwt', { session: false }),
 // @route   GET api/users/current
 // @desc    Return current user // Protected route using token
 // @access  Private
-// router.get('/all', (req, res) => {
-//     console.log('All users ');
-
-//     User.find().then(all => res.status(200).json({ all }))
-// });
+router.get('/all', passport.authenticate('jwt', { session: false }), (req, res) => {
+    console.log(req.user);
+    req.user.password = ":)";
+    User.find().then(all => res.status(200).json({ all }))
+});
 
 
 module.exports = router;

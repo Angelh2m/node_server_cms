@@ -9,6 +9,7 @@ const profile = require('./routes/api/profile');
 const posts = require('./routes/api/posts');
 const upload = require('./routes/api/uploads');
 const oauth = require('./routes/api/oauth');
+const search = require('./routes/api/search');
 
 const app = express();
 
@@ -35,15 +36,17 @@ app.use(passport.initialize());
 require('./config/passport')(passport);
 require('./config/passport-google')(passport);
 
-app.get('/', (req, res) => res.send('Hello World'));
-
-// Use Routes
+/* *
+ *  CREATED ROUTES
+ */
 app.use('/api/users', users);
 app.use('/api/upload', upload);
 app.use('/api/profile', profile);
 app.use('/api/posts', posts);
 app.use('/api/oauth', oauth);
+app.use('/api/search', search);
+app.get('/', (req, res) => res.send('Hello World'));
+
 
 const port = process.env.PORT || 5000;
-
 app.listen(port, () => console.log(`Server running on port ${port}`));

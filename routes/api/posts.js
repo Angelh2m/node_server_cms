@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const passport = require('passport');
+const nodemailer = require('nodemailer');
+const gravatar = require('gravatar');
+
+const keys = require('../../config/keys');
 
 // Post model
 const Post = require('../../models/Post');
@@ -20,13 +24,22 @@ router.get('/test', (req, res) => res.json({ msg: 'Posts Works' }));
 // @desc    Get all the posts
 // @access  Public
 router.get('/', (req, res) => {
+    const offset = Number(req.query.offset) || 0;
+
     Post.find()
+        .skip(offset)
+        .limit(5)
         .populate('likes.user', 'name avatar')
         .populate('comments.user', 'name date avatar')
-        .sort({ date: -1 })
-        .then(post => res.status(200).json({
-            post
-        }))
+        .sort({ 'entry.date': -1 })
+        .then(post => {
+            Post.count().then(el => {
+                res.status(200).json({
+                    count: el,
+                    post,
+                })
+            })
+        })
         .catch(err => res.status(404).json({
             noPostFound: 'No posts found',
             err
@@ -52,12 +65,14 @@ router.get('/:id', (req, res) => {
 router.post('/', passport.authenticate('jwt', { session: false }), (req, res) => {
 
     const newPost = new Post({
-        title: req.body.title,
-        excerpt: req.body.excerpt,
-        body: req.body.body,
-        author: req.user.id,
-        tags: req.body.tags,
-        category: req.body.category
+        entry: {
+            title: req.body.title,
+            excerpt: req.body.excerpt,
+            body: req.body.body,
+            author: req.user.id,
+            tags: req.body.tags,
+            category: req.body.category
+        }
     });
 
     newPost.save().then(post => res.json(post));
@@ -140,29 +155,124 @@ router.post('/like/:id', passport.authenticate('jwt', { session: false }), (req,
 // @route   GET api/posts/comment/:id
 // @desc    Create a new Comment
 // @access  Private
-router.post('/comment/:id', passport.authenticate('jwt', { session: false }), (req, res) => {
+router.post('/comment/:id', (req, res, next) => {
+    const replyId = req.body.replyId;
+    const userEmail = req.body.email;
+    let commentIndex;
+    let newComment = {
+        text: req.body.text,
+        name: req.body.name,
+        avatar: req.body.avatar,
+        email: userEmail,
+        isApproved: false
+    }
 
-    Post.findById(req.params.id).then(post => {
+    // If user has a payload
+    if (!userEmail) {
+        console.log('NO REGISTERED ');
 
-        const newComment = {
-            text: req.body.text,
-            name: req.body.name,
-            avatar: req.body.avatar,
-            user: req.user.id,
-            isApproved: false
-        }
+        passport.authenticate('jwt', { session: false }, (err, user, info) => {
 
-        post.comments.unshift(newComment);
+            newComment.user = user.id;
 
-        post.save().then(post => {
-            res.status(200).json({
-                post
-            })
-        }).catch(err => res.status(404).json({
-            message: 'Post not found'
-        }))
+            Post.findById(req.params.id)
+                .populate('comments.user', 'date email name avatar')
+                .then(post => {
 
-    }).catch(err => res.status(400).json({ err }))
+                    console.log(replyId);
+                    if (replyId) {
+                        post.comments.findIndex((el, index) => {
+                            el._id == replyId ? commentIndex = index : null;
+                        });
+                    }
+
+                    // There is a reply 
+                    if (commentIndex) {
+                        post.comments[commentIndex].replies.unshift(newComment);
+                        console.log(post.comments[commentIndex].replies);
+                    }
+
+                    // It only a comment
+                    if (!commentIndex) {
+                        post.comments.unshift(newComment);
+                    }
+
+                    // post.save().then(post => {
+                    //     return res.status(200).json({
+                    //         post
+                    //     })
+                    // }).catch(err => res.status(404).json({
+                    //     message: 'Error trying to post your comment'
+                    // }))
+
+                    return res.status(200).json({
+                        ok: true,
+                        post
+                    })
+
+                }).catch(err => res.status(400).json({
+                    ok: false,
+                    message: 'The post ID does not exist',
+                    err
+                }))
+
+
+        })(req, res, next);
+
+    }
+
+    // If it's a one time user login
+    if (userEmail) {
+
+        //     // newComment.avatar = gravatar.url(userEmail, {
+        //     //     s: '200', // Size
+        //     //     r: 'pg', // Rating
+        //     //     d: 'mm' // Default
+        //     // });
+
+        console.log(userEmail);
+
+        Post.findById(req.params.id)
+            .then(post => {
+
+                // There is a reply 
+                // if (commentIndex) {
+                //     post.comments.findIndex((el, index) => {
+                //         // el._id == replyId ? commentIndex = index : null;
+                //     });
+                //     post.comments[commentIndex].replies.unshift(newComment);
+                // }
+
+                // It only a comment
+                if (!commentIndex) {
+                    post.comments.unshift(newComment);
+                    console.log(newComment);
+                }
+
+
+
+                post.save().then(post => {
+                        res.status(200).json({
+                            post
+                        });
+                    })
+                    .catch(err => res.status(404).json({
+                        message: 'Error trying to post your comment',
+                        err
+                    }))
+
+                // return res.status(200).json({
+                //     ok: true,
+                //     post
+                // });
+
+            }).catch(err => res.status(400).json({
+                ok: false,
+                message: 'The post ID does not exist',
+                err
+            }))
+    }
+
 });
 
 
@@ -182,6 +292,39 @@ router.put('/comment/:id', (req, res) => {
 
         entry.comments[commentID].isApproved = isApproved;
         console.log(entry.comments[commentID].isApproved);
+
+
+        nodemailer.createTestAccount((err, account) => {
+            // create reusable transporter object using the default SMTP transport
+            let transporter = nodemailer.createTransport({
+                host: 'smtp.gmail.com',
+                port: 465,
+                secure: true, // true for 465, false for other ports
+                auth: {
+                    user: keys.googleEmailAccount, // generated ethereal user
+                    pass: keys.googlePasswordAccount // generated ethereal password
+                }
+            });
+
+            // setup email data with unicode symbols
+            let mailOptions = {
+                from: '"Fred Foo 👻" <angelh2m@gmail.com>', // sender address
+                to: 'angelh2m@gmail.com', // list of receivers
+                subject: 'Hello ✔', // Subject line
+                text: 'Hello world?', // plain text body
+                html: '<b>Hello world</b>' // html body
+            };
+
+            // send mail with defined transport object
+            transporter.sendMail(mailOptions, (error, info) => {
+                if (error) {
+                    return console.log(error);
+                }
+                console.log('Message sent: %s', info.messageId);
+                // console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+            });
+        });
+
 
         entry.save()
             .then(el => res.status(200).json({ el }))
