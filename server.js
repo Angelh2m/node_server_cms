@@ -10,6 +10,7 @@ const posts = require('./routes/api/posts');
 const upload = require('./routes/api/uploads');
 const oauth = require('./routes/api/oauth');
 const search = require('./routes/api/search');
+const tools = require('./routes/api/tools');
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use('/api/profile', profile);
 app.use('/api/posts', posts);
 app.use('/api/oauth', oauth);
 app.use('/api/search', search);
+app.use('/api/tools', tools);
 app.get('/', (req, res) => res.send('Hello World'));
 
 
